@@ -1,0 +1,156 @@
+---
+title: "Final Project Coursera Machine Learning Class"
+author: "Moriarty"
+date: "Aug 26, 2017"
+output: html_document
+---
+
+# Final Project Coursera Machine Learning Class
+## Fitbit Data Analysis and Prediction
+### Moriarty
+
+### Introduction
+
+We're taking a look at data collected from a FitBit human movement tracking device when people were lifting a barbell in unique ways.  We're going to build a model to predict what lifting type they used based on the data the fitbit recorded.  This lifting type is the 'classe' variable in the dataset.
+
+Load in the required libraries.
+
+```{r}
+library(caret)
+library(ggplot2)
+library(randomForest)
+```
+
+Read in the data.  THere is a testing set and a training set.  Replace any div/0 or blanks with NA.
+
+
+```{r}
+testing_data = read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+training_data = read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+
+head(training_data)
+dim(training_data)
+
+str(training_data)
+```
+
+##Data Cleanup / Feature Selection
+Remove features with NA.
+
+```{r}
+keepers <- !sapply(training_data, function(x) any(is.na(x)))
+training_data = training_data[,keepers]
+```
+This reduced number of columns from 160 to 60
+
+```{r}
+str(training_data)
+dim(training_data)
+```
+
+Removing features with ""
+
+```{r}
+keepers <- !sapply(training_data, function(x) any(x==""))
+training_data <- training_data[, keepers]
+
+
+
+str(training_data)
+dim(training_data)
+```
+
+Now we'll do the same cleanup to the testing data.
+
+```{r}
+dim(testing_data)
+
+str(testing_data)
+```
+
+Remove features with NA.
+
+```{r}
+keepers <- !sapply(testing_data, function(x) any(is.na(x)))
+testing_data = testing_data[,keepers]
+```
+
+This reduced columns from 160 to 60
+
+```{r}
+str(testing_data)
+dim(testing_data)
+```
+
+Removing features with ""
+
+```{r}
+keepers <- !sapply(testing_data, function(x) any(x==""))
+testing_data <- testing_data[, keepers]
+
+str(testing_data)
+dim(testing_data)
+```
+
+This also reduced the number of data columns to 60.  Only 20 rows.
+
+
+We're going to split the training data into a training set and a testing set.  
+
+```{r}
+inTrain <- createDataPartition(y=training_data$classe, p=0.80, list=FALSE)
+new_train <- training_data[inTrain, ]
+new_test <- training_data[-inTrain, ]
+dim(new_train)
+dim(new_test)
+str(new_train)
+str(new_test)
+```
+
+Throw out uneeded columns.  These are labels or timestamps for the mostpart.
+```{r}
+no_need <- c('X','user_name','raw_timestamp_part_1','raw_timestamp_part_2','cvtd_timestamp','new_window')
+new_train <- new_train[,!(names(new_train) %in% no_need)]
+new_test <- new_test[,!(names(new_test) %in% no_need)]
+
+dim(new_train)
+dim(new_test)
+```
+
+Time to build the model.  Let's do random forest with 5 fold cross validation.
+
+```{r}
+rf_model <- train(classe~., data = new_train, method = "rf", trControl=trainControl(method="cv",number=5))
+
+print(rf_model)
+```
+
+Variable importance plot.  num_window, roll_belt, pitch_forarm, yaw_belt, magnet_dumbbell_z were the most important.
+
+```{r}
+print(plot(varImp(rf_model, scale = FALSE)))
+```
+
+Print confusion matrix
+
+```{r}
+print(rf_model$finalModel)
+```
+
+We're getting a 99.82% out of sample accuracy rate.
+
+Let's predict classe using the test_set.
+
+We only want the columns used in our model building on the final testing set.
+
+```{r}
+testing_data<-testing_data[,intersect(names(new_train),names(testing_data))] 
+
+testing_preds <- predict(rf_model, testing_data)
+```
+
+Here is what our model predicts.
+
+```{r}
+print(testing_preds)
+```
